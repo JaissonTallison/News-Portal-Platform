@@ -1,0 +1,17 @@
+export type ApiSuccess<T> = {
+  success: true;
+  data: T;
+  meta?: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+};
+
+export type ApiError = {
+  success: false;
+  error: string;
+};
+
+export type ApiResponse<T> = ApiSuccess<T> | ApiError;
