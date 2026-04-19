@@ -1,13 +1,19 @@
-import { cookies } from "next/headers";
+// apps/web/lib/auth-server.ts
+
+import { NextRequest } from "next/server";
 import { verifyToken } from "./jwt";
 
-export async function getCurrentUserServer() {
-  const cookieStore = await cookies();
-  const token = cookieStore.get("token")?.value;
+export async function getUserFromRequest(req: NextRequest) {
+  const token =
+    req.cookies.get("token")?.value ||
+    req.headers.get("authorization")?.replace("Bearer ", "");
 
   if (!token) return null;
 
-  const user = verifyToken(token);
-
-  return user || null;
+  try {
+    const decoded = verifyToken(token);
+    return decoded;
+  } catch {
+    return null;
+  }
 }

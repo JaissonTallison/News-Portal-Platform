@@ -1,56 +1,62 @@
-import { hashPassword, comparePassword } from "@/lib/hash";
-import {
-  createUser,
-  findUserByEmail,
-} from "../repositories/user.repository";
+// apps/web/server/services/auth.service.ts
+
 import { signToken } from "@/lib/jwt";
+import { userRepository } from "../repositories/user.repository";
+import bcrypt from "bcrypt";
 
-export async function registerUser(
-  name: string,
-  email: string,
-  password: string
-) {
-  const userExists = await findUserByEmail(email);
+interface RegisterDTO {
+  name: string;
+  email: string;
+  password: string;
+}
 
-  if (userExists) {
-    throw new Error("Usuário já existe");
+export async function registerUser(data: RegisterDTO) {
+  const existingUser = await userRepository.findByEmail(data.email);
+
+  if (existingUser) {
+    throw new Error("Email já cadastrado");
   }
 
-  const passwordHash = await hashPassword(password);
+  const passwordHash = await bcrypt.hash(data.password, 12);
 
-  const user = await createUser({
-    name,
-    email,
-    passwordHash,
+  const user = await userRepository.create({
+    name: data.name,
+    email: data.email,
+    passwordHash: passwordHash,
+    role: "USER",
+  });
+
+  const token = signToken({
+    id: user.id,
+    role: user.role,
   });
 
   return {
-    id: user.id,
-    name: user.name,
-    email: user.email,
-    role: user.role,
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+    },
+    token,
   };
 }
 
 export async function loginUser(email: string, password: string) {
-  const user = await findUserByEmail(email);
+  const user = await userRepository.findByEmail(email);
 
   if (!user) {
     throw new Error("Credenciais inválidas");
   }
 
-  const isValid = await comparePassword(
-    password,
-    user.passwordHash
-  );
+  const isValid = await bcrypt.compare(password, user.passwordHash);
 
   if (!isValid) {
     throw new Error("Credenciais inválidas");
   }
 
-  //  TOKEN CORRETO
   const token = signToken({
-    userId: user.id,
+    id: user.id,
     role: user.role,
   });
 

@@ -1,79 +1,33 @@
-import { createPostSchema } from "@/server/validators/post.validator";
-import {
-  createPostService,
-  listPostsService,
-} from "@/server/services/post.service";
-import { getCurrentUserServer } from "@/lib/auth-server"; //  CORRETO
+// apps/web/app/api/posts/route.ts
 
-export async function POST(req: Request) {
+import { NextRequest, NextResponse } from "next/server";
+import { requireAuth } from "@/server/auth/guards";
+import { createPost } from "@/server/services/post.service";
+
+export async function POST(req: NextRequest) {
   try {
-    //  autenticação
-    const user = await getCurrentUserServer();
-
-    if (!user) {
-      return Response.json(
-        { success: false, error: "Não autorizado" },
-        { status: 401 }
-      );
-    }
-
+    const user = await requireAuth(req);
     const body = await req.json();
-    const parsed = createPostSchema.parse(body);
 
-    const post = await createPostService(parsed, user);
+    const post = await createPost(user, body);
 
-    return Response.json({
-      success: true,
-      data: post,
-    });
+    return NextResponse.json(post);
   } catch (error: unknown) {
-    console.error("POST /api/posts error:", error);
+    if (error instanceof Error) {
+      let status = 400;
 
-    return Response.json(
-      {
-        success: false,
-        error:
-          error instanceof Error
-            ? error.message
-            : "Erro interno",
-      },
-      { status: 400 } //  400 aqui faz mais sentido que 401
-    );
-  }
-}
+      if (error.message === "Unauthorized") status = 401;
+      else if (error.message === "Forbidden") status = 403;
 
-export async function GET(req: Request) {
-  try {
-    //  protege rota
-    const user = await getCurrentUserServer();
-
-    if (!user) {
-      return Response.json(
-        { success: false, error: "Não autorizado" },
-        { status: 401 }
+      return NextResponse.json(
+        { message: error.message },
+        { status }
       );
     }
 
-    const { searchParams } = new URL(req.url);
-
-    const page = Number(searchParams.get("page") || "1");
-    const limit = Number(searchParams.get("limit") || "10");
-
-    const result = await listPostsService(page, limit);
-
-    return Response.json({
-      success: true,
-      ...result,
-    });
-  } catch (error: unknown) {
-    console.error("GET /api/posts error:", error);
-
-    return Response.json(
-      {
-        success: false,
-        error: "Erro ao listar posts",
-      },
-      { status: 400 }
+    return NextResponse.json(
+      { message: "Internal server error" },
+      { status: 500 }
     );
   }
 }
